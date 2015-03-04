@@ -30,12 +30,20 @@ void set_running(bool val)
 
 void button_listen()
 {
+	int newState;
 	while(is_running())
 	{
-		if (btn.Read() == LOW)
-			led.Write(HIGH);
-		else
-			led.Write(LOW);
+		newState = btn.Read();	
+		if (newState != buttonState)
+		{
+			// button state changed, fire event
+			if (newState == LOW)
+				led.Write(HIGH);
+			else
+				led.Write(LOW);
+		
+			buttonState = newState;
+		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
