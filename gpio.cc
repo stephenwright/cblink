@@ -1,24 +1,26 @@
+/** @file gpio.cc */
 
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
- 
-#define IN  0
-#define OUT 1
+#include "gpio.hh"
 
-#define LOW  0
-#define HIGH 1
- 
-#define PIN  24 /* P1-18 */
-#define POUT 4  /* P1-07 */
- 
-static int
-GPIOExport(int pin)
-{
 #define BUFFER_MAX 3
+#define DIRECTION_MAX 35
+#define VALUE_MAX 30
+
+GPIO::GPIO(int pin)
+: _pin(pin)
+{
+	Export();
+}
+
+GPIO::~GPIO()
+{
+	Unexport();
+}
+
+int
+GPIO::Export()
+{
+	std::lock_guard<std::mutex> guard(_mtx);
 	char buffer[BUFFER_MAX];
 	ssize_t bytes_written;
 	int fd;
@@ -29,15 +31,16 @@ GPIOExport(int pin)
 		return(-1);
 	}
  
-	bytes_written = snprintf(buffer, BUFFER_MAX, "%d", pin);
+	bytes_written = snprintf(buffer, BUFFER_MAX, "%d", _pin);
 	write(fd, buffer, bytes_written);
 	close(fd);
 	return(0);
 }
- 
-static int
-GPIOUnexport(int pin)
+
+int
+GPIO::Unexport()
 {
+	std::lock_guard<std::mutex> guard(_mtx);
 	char buffer[BUFFER_MAX];
 	ssize_t bytes_written;
 	int fd;
@@ -48,22 +51,22 @@ GPIOUnexport(int pin)
 		return(-1);
 	}
  
-	bytes_written = snprintf(buffer, BUFFER_MAX, "%d", pin);
+	bytes_written = snprintf(buffer, BUFFER_MAX, "%d", _pin);
 	write(fd, buffer, bytes_written);
 	close(fd);
 	return(0);
 }
  
-static int
-GPIODirection(int pin, int dir)
+int
+GPIO::Direction(int dir)
 {
+	std::lock_guard<std::mutex> guard(_mtx);
 	static const char s_directions_str[]  = "in\0out";
  
-#define DIRECTION_MAX 35
 	char path[DIRECTION_MAX];
 	int fd;
  
-	snprintf(path, DIRECTION_MAX, "/sys/class/gpio/gpio%d/direction", pin);
+	snprintf(path, DIRECTION_MAX, "/sys/class/gpio/gpio%d/direction", _pin);
 	fd = open(path, O_WRONLY);
 	if (-1 == fd) {
 		fprintf(stderr, "Failed to open gpio direction for writing!\n");
@@ -79,15 +82,15 @@ GPIODirection(int pin, int dir)
 	return(0);
 }
  
-static int
-GPIORead(int pin)
+int
+GPIO::Read()
 {
-#define VALUE_MAX 30
+	std::lock_guard<std::mutex> guard(_mtx);
 	char path[VALUE_MAX];
 	char value_str[3];
 	int fd;
  
-	snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", pin);
+	snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", _pin);
 	fd = open(path, O_RDONLY);
 	if (-1 == fd) {
 		fprintf(stderr, "Failed to open gpio value for reading!\n");
@@ -104,15 +107,16 @@ GPIORead(int pin)
 	return(atoi(value_str));
 }
  
-static int
-GPIOWrite(int pin, int value)
+int
+GPIO::Write(int value)
 {
+	std::lock_guard<std::mutex> guard(_mtx);
 	static const char s_values_str[] = "01";
  
 	char path[VALUE_MAX];
 	int fd;
  
-	snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", pin);
+	snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", _pin);
 	fd = open(path, O_WRONLY);
 	if (-1 == fd) {
 		fprintf(stderr, "Failed to open gpio value for writing!\n");
@@ -127,3 +131,4 @@ GPIOWrite(int pin, int value)
 	close(fd);
 	return(0);
 }
+

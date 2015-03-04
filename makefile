@@ -7,11 +7,11 @@ NAME	= blink
 CC 		= g++
 ECHO 	= echo
 
-CFLAGS 	= -std=c++11
+CFLAGS 	= -std=c++11 -pthread
 
 # options
 OPTS 	= 
 
 app:
-	$(CC) $(CFLAGS) -o blink blink.c
+	$(CC) $(CFLAGS) -o blink blink.cc gpio.cc
 
