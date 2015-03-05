@@ -1,15 +1,30 @@
 /** @file gpio.cc */
 
+#include <exception>
+#include <stdexcept>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <iostream>
 #include "gpio.hh"
 
-#define BUFFER_MAX 3
-#define DIRECTION_MAX 35
-#define VALUE_MAX 30
+const std::string GPIO::PATH_EXPORT 	= "/sys/class/gpio/export";
+const std::string GPIO::PATH_UNEXPORT 	= "/sys/class/gpio/unexport";
+const std::string GPIO::PREFIX 			= "/sys/class/gpio/gpio";
 
 GPIO::GPIO(int pin)
 : _pin(pin)
 {
 	Export();
+
+	std::stringstream directionPath;
+	std::stringstream valuePath;
+
+	directionPath << PREFIX << _pin << "/direction";
+	valuePath << PREFIX << _pin << "/value";
+
+	_direction.open(directionPath.str(), std::ios::out);
+	_value.open(valuePath.str());
 }
 
 GPIO::~GPIO()
@@ -17,118 +32,78 @@ GPIO::~GPIO()
 	Unexport();
 }
 
-int
-GPIO::Export()
+bool
+GPIO::Exists()
 {
-	std::lock_guard<std::mutex> guard(_mtx);
-	char buffer[BUFFER_MAX];
-	ssize_t bytes_written;
-	int fd;
- 
-	fd = open("/sys/class/gpio/export", O_WRONLY);
-	if (-1 == fd) {
-		fprintf(stderr, "Failed to open export for writing!\n");
-		return(-1);
-	}
- 
-	bytes_written = snprintf(buffer, BUFFER_MAX, "%d", _pin);
-	write(fd, buffer, bytes_written);
-	close(fd);
-	return(0);
+	std::stringstream path;
+	path << PREFIX << _pin;
+
+	std::fstream fs;
+	fs.open(path.str());
+	return fs.good();
 }
 
-int
+void
+GPIO::Export()
+{
+	if (Exists())
+		return;
+
+	std::fstream fs;
+	std::stringstream ss;
+
+	ss << _pin;
+	fs.open(PATH_EXPORT, std::ios::out);
+	fs << ss.str();
+}
+
+void
 GPIO::Unexport()
 {
-	std::lock_guard<std::mutex> guard(_mtx);
-	char buffer[BUFFER_MAX];
-	ssize_t bytes_written;
-	int fd;
- 
-	fd = open("/sys/class/gpio/unexport", O_WRONLY);
-	if (-1 == fd) {
-		fprintf(stderr, "Failed to open unexport for writing!\n");
-		return(-1);
-	}
- 
-	bytes_written = snprintf(buffer, BUFFER_MAX, "%d", _pin);
-	write(fd, buffer, bytes_written);
-	close(fd);
-	return(0);
+	if (!Exists())
+		return;
+
+	std::fstream fs;
+	std::stringstream ss;
+
+	ss << _pin;
+	fs.open(PATH_UNEXPORT, std::ios::out);
+	fs << ss.str();
 }
  
-int
+void
 GPIO::Direction(int dir)
 {
-	std::lock_guard<std::mutex> guard(_mtx);
-	static const char s_directions_str[]  = "in\0out";
- 
-	char path[DIRECTION_MAX];
-	int fd;
- 
-	snprintf(path, DIRECTION_MAX, "/sys/class/gpio/gpio%d/direction", _pin);
-	fd = open(path, O_WRONLY);
-	if (-1 == fd) {
-		fprintf(stderr, "Failed to open gpio direction for writing!\n");
-		return(-1);
-	}
- 
-	if (-1 == write(fd, &s_directions_str[IN == dir ? 0 : 3], IN == dir ? 2 : 3)) {
-		fprintf(stderr, "Failed to set direction!\n");
-		return(-1);
-	}
- 
-	close(fd);
-	return(0);
+	_direction.seekp(0);
+	_direction << (dir == IN ? "in" : "out") << std::endl;
+
+	if (!_direction.good())
+		throw std::runtime_error("Error setting direction.");
 }
  
 int
 GPIO::Read()
 {
-	std::lock_guard<std::mutex> guard(_mtx);
-	char path[VALUE_MAX];
-	char value_str[3];
-	int fd;
- 
-	snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", _pin);
-	fd = open(path, O_RDONLY);
-	if (-1 == fd) {
-		fprintf(stderr, "Failed to open gpio value for reading!\n");
-		return(-1);
-	}
- 
-	if (-1 == read(fd, value_str, 3)) {
-		fprintf(stderr, "Failed to read value!\n");
-		return(-1);
-	}
- 
-	close(fd);
- 
-	return(atoi(value_str));
+	std::string value;
+	_value.seekg(0);
+	_value >> value;
+
+	if (value == "0") return LOW;
+	if (value == "1") return HIGH;
+
+	throw std::logic_error("Invalid GPIO value.");
 }
  
-int
+void
 GPIO::Write(int value)
 {
-	std::lock_guard<std::mutex> guard(_mtx);
-	static const char s_values_str[] = "01";
- 
-	char path[VALUE_MAX];
-	int fd;
- 
-	snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", _pin);
-	fd = open(path, O_WRONLY);
-	if (-1 == fd) {
-		fprintf(stderr, "Failed to open gpio value for writing!\n");
-		return(-1);
-	}
- 
-	if (1 != write(fd, &s_values_str[LOW == value ? 0 : 1], 1)) {
-		fprintf(stderr, "Failed to write value!\n");
-		return(-1);
-	}
- 
-	close(fd);
-	return(0);
+	if (value != HIGH && value != LOW)
+		throw std::logic_error("Invalid GPIO value.");
+
+	_value.seekg(0);
+	_value << (value == HIGH ? "1" : "0") << std::endl;
+
+	if (!_value.good())
+		throw std::runtime_error("Error writing value.");
 }
 

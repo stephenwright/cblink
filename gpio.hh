@@ -3,13 +3,8 @@
 #ifndef _GPIO_HH_
 #define _GPIO_HH_
 
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <mutex>
+#include <string>
+#include <fstream>
  
 #define IN  0
 #define OUT 1
@@ -23,17 +18,24 @@ public:
 	GPIO(int pin);
 	~GPIO();
 
-	int Direction(int dir);
-	int Read();
-	int Write(int value);
+	void Direction(int dir);
+	int  Read();
+	void Write(int value);
 
 private:
-	int Export();
-	int Unexport();
+	bool Exists();
+	void Export();
+	void Unexport();
 
 private:
 	int _pin;
-	std::mutex _mtx;
+
+	std::fstream _direction;
+	std::fstream _value;
+
+	static const std::string PATH_EXPORT;
+	static const std::string PATH_UNEXPORT;
+	static const std::string PREFIX;
 		
 };
 

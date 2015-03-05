@@ -1,7 +1,7 @@
 /** @file blink.cc */
 
+#include <exception>
 #include <iostream>
-#include <string>
 #include <chrono>
 #include <thread>
 #include <mutex>
@@ -12,9 +12,6 @@
 
 bool running = true;
 std::mutex mtx;
-GPIO led(LED);
-GPIO btn(BTN);
-int buttonState = HIGH;
 
 bool is_running()
 {
@@ -30,6 +27,9 @@ void set_running(bool val)
 
 void button_listen()
 {
+	GPIO led(LED);
+	GPIO btn(BTN);
+	int buttonState = btn.Read();
 	int newState;
 	while(is_running())
 	{
@@ -49,25 +49,35 @@ void button_listen()
 	}
 }
 
-int main(void)
+int main()
 {
 	std::cout << "Enter a command, or 'exit' to quit\n";
 	std::string cmd;
 
-	led.Direction(OUT);
-	btn.Direction(IN);
-
 	std::thread t_input(button_listen);
 
-	while (cmd != "exit") 
+	try
 	{
-		std::cout << "> ";
-		std::getline(std::cin, cmd);
+		GPIO led(LED);
+		GPIO btn(BTN);
 
-		if (cmd == "on")
-			led.Write(HIGH);
-		else if (cmd == "off")
-			led.Write(LOW);
+		led.Direction(OUT);
+		btn.Direction(IN);
+
+		while (cmd != "exit") 
+		{
+			std::cout << "> ";
+			std::getline(std::cin, cmd);
+
+			if (cmd == "on")
+				led.Write(HIGH);
+			else if (cmd == "off")
+				led.Write(LOW);
+		}
+	}
+	catch (std::exception& e)
+	{
+		std::cout << e.what() << '\n';
 	}
 
 	set_running(false);
