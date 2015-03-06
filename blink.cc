@@ -39,7 +39,7 @@ q_pop()
 // ============================================================================
 
 bool is_running = true;
-bool do_blink = false;
+bool is_blinking = false;
 
 /*
  * Continuously blink the LED until instructive otherwise
@@ -48,13 +48,13 @@ void
 blink()
 {
 	// ignore if already blinking
-	if (do_blink)
+	if (is_blinking)
 		return;
 
-	do_blink = true;
+	is_blinking = true;
 	bool is_on = false;
 
-	while (do_blink)
+	while (is_blinking)
 	{
 		q_push((is_on = !is_on) ? "on" : "off");
 		std::this_thread::sleep_for(std::chrono::milliseconds(800));
@@ -143,14 +143,14 @@ controller()
 		}
 		else if (msg == "start" || msg == "blink")
 		{
-			if (!do_blink) { t_blink = std::thread(blink); }
+			if (!is_blinking) { t_blink = std::thread(blink); }
 		}
 		else if (msg == "stop")
 		{
-			if (do_blink) { do_blink = false; t_blink.join(); }
+			if (is_blinking) { is_blinking = false; t_blink.join(); }
 		}
 	}
-	if (do_blink) { do_blink = false; t_blink.join(); }
+	if (is_blinking) { is_blinking = false; t_blink.join(); }
 }
 
 // ============================================================================
