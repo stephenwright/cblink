@@ -14,4 +14,8 @@ The program accepts the following commands:
 
  * on - turn on the LED
  * off - turn off the LED
- * button - turn on the LED, and wait for button press, which turns off the LED
+ * blink|start - begin blinking the LED
+ * stop - stop blinking
+
+pressing the button will turn on the LED
+
